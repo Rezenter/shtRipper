@@ -1,6 +1,4 @@
 import struct
-import json
-
 import matplotlib.pyplot as plt
 
 version_length = 11
@@ -8,8 +6,6 @@ size_int = 4
 size_double = 8
 size_long = 8
 encoding = 'cp1251'
-
-shotn = 38516
 
 
 def reconstruct_graph(table):
@@ -59,19 +55,6 @@ def decompress_huffman(compressed):  # (unsigned char* compressed, graph[256])
 
 
 def decompress_rle(comp):
-    '''
-    n_bytes = 0
-    i = 0
-    while True:
-        delta = comp[i] & 127
-        if (comp[i] & 128) == 0:
-            i += 2
-        else:
-            i += delta + 1
-        n_bytes += delta
-        if i >= len(comp):
-            break
-    '''
     n_bytes = 0
     i = 0
     result = []
@@ -177,13 +160,27 @@ def unpack_struct(pack):
     return res
 
 
-def plot_hist(hist):
+def x_y(hist):
     x = []
     y = []
-    t_mult = (hist['tMax'] - hist['tMin']) / (hist['#ch'] - 1)
-    for i in range(len(hist['data'])):
-        x.append(i * t_mult + hist['tMin'])
-        y.append(hist['data'][i] * hist['delta'] + hist['uMin'])
+    if hist['type'] >> 16 == 0:
+        t_mult = (hist['tMax'] - hist['tMin']) / (hist['#ch'] - 1)
+        for i in range(len(hist['data'])):
+            x.append(i * t_mult + hist['tMin'])
+            y.append(hist['data'][i] * hist['delta'] + hist['uMin'])
+    elif hist['type'] >> 16 == 1:
+        for i in range(len(hist['data']) // 2):
+            x.append(hist['data'][i * 2])
+            y.append(hist['data'][i * 2 + 1])
+    elif hist['type'] >> 16 == 2:
+        for i in range(len(hist['data']) // 3):
+            x.append(hist['data'][i * 3])
+            y.append(hist['data'][i * 3 + 1])
+    return x, y
+
+
+def plot_hist(hist):
+    x, y = x_y(hist)
     plt.plot(x, y)
     plt.title(hist['name'])
     plt.xlabel('time (s)')
@@ -191,47 +188,54 @@ def plot_hist(hist):
     plt.show()
 
 
-filename = 'in/sht%d.SHT' % shotn
-with open(filename, 'rb') as file:
-    version_str = file.read(version_length).decode('ascii')
-    version = -1
-    if version_str[0:8] == 'ANALIZER':
-        if version_str[-1] == '0':
-            version = 0
-        elif version_str[-1] == '1':
-            version = 1
-        elif version_str[-1] == '2':
-            version = 2
+def extract(path, shotn, requested=None):
+    filename = '%s/sht%d.SHT' % (path, shotn)
+    with open(filename, 'rb') as file:
+        version_str = file.read(version_length).decode('ascii')
+        version = -1
+        if version_str[0:8] == 'ANALIZER':
+            if version_str[-1] == '0':
+                version = 0
+            elif version_str[-1] == '1':
+                version = 1
+            elif version_str[-1] == '2':
+                version = 2
+            else:
+                print("Unknown version of .sht file: %d" % version)
+                exit(1)
+            print('version = %d' % version)
         else:
-            print("Unknown version of .sht file: %d" % version)
+            print("Unknown version header of .sht file: '%s'" % version_str)
             exit(1)
-        print('version = %d' % version)
-    else:
-        print("Unknown version header of .sht file: '%s'" % version_str)
-        exit(1)
 
-    file.seek(1, 1)  # wtf?
+        file.seek(1, 1)  # wtf?
 
-    count = struct.unpack('i', file.read(size_int))[0]
-    print('count %d' % count)
-    if version == 0:
-        print('not implemented')
-        exit(2)
-    elif version == 1:
-        print('not implemented')
-        exit(2)
-    else:
-        result = {}
-        for l in range(count):
-            size = struct.unpack('i', file.read(size_int))[0]
-            print('size %d' % size)
-            if size > 0:
-                print('decompressing...')
-                huff = decompress_huffman(file.read(size))
-                print('huffman')
-                result[l] = unpack_struct(decompress_rle(huff))
-                #print(result[l])
-                plot_hist(result[l])
-                print('decompressed %d of %d' % (l + 1, count))
-        json.dump(result,  'in/sht%d.json' % shotn)
-    print('OK')
+        count = struct.unpack('i', file.read(size_int))[0]
+        print('count %d' % count)
+        if version == 0:
+            print('not implemented')
+            exit(2)
+        elif version == 1:
+            print('not implemented')
+            exit(2)
+        else:
+            result = {}
+            queue = []
+            if requested is None:
+                queue = range(count)
+            else:
+                for item in requested:
+                    if 0 <= item < count:
+                        queue.append(item)
+                    else:
+                        print('Requested item %d is out of range [%d, %d)' % (item, 0, count))
+            for l in range(count):
+                size = struct.unpack('i', file.read(size_int))[0]
+                if size > 0:
+                    raw = file.read(size)
+                    if l in queue:
+                        print('decompressing...')
+                        huff = decompress_huffman(raw)
+                        result[l] = unpack_struct(decompress_rle(huff))
+                        print('decompressed %d of %d' % (l + 1, len(queue)))
+            return result
