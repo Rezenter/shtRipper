@@ -229,6 +229,7 @@ def extract(path, shotn, requested=None):
                         queue.append(item)
                     else:
                         print('Requested item %d is out of range [%d, %d)' % (item, 0, count))
+            processed = 1
             for l in range(count):
                 size = struct.unpack('i', file.read(size_int))[0]
                 if size > 0:
@@ -237,5 +238,6 @@ def extract(path, shotn, requested=None):
                         print('decompressing...')
                         huff = decompress_huffman(raw)
                         result[l] = unpack_struct(decompress_rle(huff))
-                        print('decompressed %d of %d' % (l + 1, len(queue)))
+                        print('decompressed %d of %d' % (processed, len(queue)))
+                        processed += 1
             return result
