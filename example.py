@@ -1,6 +1,6 @@
 import ripper
 
-data = ripper.extract('*', 38516, [17])  # extract only 17th (from zero) chart of 38516 discharge in relative path 'in'
+data = ripper.extract('', 38516, [17])  # extract only 17th (from zero) chart of 38516 discharge in relative path 'in'
 
 #data_all = ripper.extract('in', 38516)  # extract all charts of 38516 discharge in relative path 'in'
 

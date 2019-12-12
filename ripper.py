@@ -1,12 +1,9 @@
 import struct
-import matplotlib.pyplot as plt
-import urllib
-from smb.SMBHandler import SMBHandler
 
 # to-do:
 # - add error handling
+# - support old versions
 
-opener = urllib.request.build_opener(SMBHandler)
 version_length = 11
 size_int = 4
 size_double = 8
@@ -186,6 +183,7 @@ def x_y(hist):
 
 
 def plot_hist(hist):
+    import matplotlib.pyplot as plt
     x, y = x_y(hist)
     plt.plot(x, y)
     plt.title(hist['name'])
@@ -195,7 +193,10 @@ def plot_hist(hist):
 
 
 def extract(path, shotn, requested=None):
-    if path == '*':
+    if len(path) == 0:
+        import urllib
+        from smb.SMBHandler import SMBHandler
+        opener = urllib.request.build_opener(SMBHandler)
         print('Connecting to remote...')
         file = opener.open('smb://guest:Globus-M@172.16.12.127/Data/sht%d.SHT' % shotn)
     else:
