@@ -1,6 +1,12 @@
 import struct
 import matplotlib.pyplot as plt
+import urllib
+from smb.SMBHandler import SMBHandler
 
+# to-do:
+# - add error handling
+
+opener = urllib.request.build_opener(SMBHandler)
 version_length = 11
 size_int = 4
 size_double = 8
@@ -189,55 +195,59 @@ def plot_hist(hist):
 
 
 def extract(path, shotn, requested=None):
-    filename = '%s/sht%d.SHT' % (path, shotn)
-    with open(filename, 'rb') as file:
-        version_str = file.read(version_length).decode('ascii')
-        version = -1
-        if version_str[0:8] == 'ANALIZER':
-            if version_str[-1] == '0':
-                version = 0
-            elif version_str[-1] == '1':
-                version = 1
-            elif version_str[-1] == '2':
-                version = 2
-            else:
-                print("Unknown version of .sht file: %d" % version)
-                exit(1)
-            print('version = %d' % version)
+    if path == '*':
+        print('Connecting to remote...')
+        file = opener.open('smb://guest:Globus-M@172.16.12.127/Data/sht%d.SHT' % shotn)
+    else:
+        file = open('%s/sht%d.SHT' % (path, shotn), 'rb')
+    version_str = file.read(version_length).decode('ascii')
+    version = -1
+    if version_str[0:8] == 'ANALIZER':
+        if version_str[-1] == '0':
+            version = 0
+        elif version_str[-1] == '1':
+            version = 1
+        elif version_str[-1] == '2':
+            version = 2
         else:
-            print("Unknown version header of .sht file: '%s'" % version_str)
+            print("Unknown version of .sht file: %d" % version)
             exit(1)
+        print('version = %d' % version)
+    else:
+        print("Unknown version header of .sht file: '%s'" % version_str)
+        exit(1)
 
-        file.seek(1, 1)  # wtf?
+    file.seek(1, 1)  # wtf?
 
-        count = struct.unpack('i', file.read(size_int))[0]
-        print('count %d' % count)
-        if version == 0:
-            print('not implemented')
-            exit(2)
-        elif version == 1:
-            print('not implemented')
-            exit(2)
+    count = struct.unpack('i', file.read(size_int))[0]
+    print('count %d' % count)
+    if version == 0:
+        print('not implemented')
+        exit(2)
+    elif version == 1:
+        print('not implemented')
+        exit(2)
+    else:
+        result = {}
+        queue = []
+        if requested is None:
+            queue = range(count)
         else:
-            result = {}
-            queue = []
-            if requested is None:
-                queue = range(count)
-            else:
-                for item in requested:
-                    if 0 <= item < count:
-                        queue.append(item)
-                    else:
-                        print('Requested item %d is out of range [%d, %d)' % (item, 0, count))
-            processed = 1
-            for l in range(count):
-                size = struct.unpack('i', file.read(size_int))[0]
-                if size > 0:
-                    raw = file.read(size)
-                    if l in queue:
-                        print('decompressing...')
-                        huff = decompress_huffman(raw)
-                        result[l] = unpack_struct(decompress_rle(huff))
-                        print('decompressed %d of %d' % (processed, len(queue)))
-                        processed += 1
-            return result
+            for item in requested:
+                if 0 <= item < count:
+                    queue.append(item)
+                else:
+                    print('Requested item %d is out of range [%d, %d)' % (item, 0, count))
+        processed = 1
+        for l in range(count):
+            size = struct.unpack('i', file.read(size_int))[0]
+            if size > 0:
+                raw = file.read(size)
+                if l in queue:
+                    print('decompressing...')
+                    huff = decompress_huffman(raw)
+                    result[l] = unpack_struct(decompress_rle(huff))
+                    print('decompressed %d of %d' % (processed, len(queue)))
+                    processed += 1
+        file.close()
+        return result
