@@ -1,8 +1,10 @@
 import struct
+import re
 
 # to-do:
 # - add error handling
 # - support old versions
+# - numpy is faster
 
 version_length = 11
 size_int = 4
@@ -33,12 +35,8 @@ def reconstruct_graph(table):
     return graph
 
 
-def decompress_huffman(compressed):  # (unsigned char* compressed, graph[256])
+def decompress_huffman(compressed, graph):  # (unsigned char* compressed, graph[256])
     size = struct.unpack('i', compressed[511: 511 + size_int])[0]
-    table = [511 for i in range(511)]
-    for i in range(511):
-        table[i] = struct.unpack('B', compressed[i: i + 1])[0]
-    graph = reconstruct_graph(table)
     result = [255 for i in range(size)]
     index = 0
     for i in range(size):
@@ -61,7 +59,7 @@ def decompress_rle(comp):
     n_bytes = 0
     i = 0
     result = []
-    while True:
+    while 1:
         delta = comp[i] & 127
         if (comp[i] & 128) == 0:
             for j in range(delta):
@@ -192,6 +190,52 @@ def plot_hist(hist):
     plt.show()
 
 
+def decompress_name(compressed):
+    size = struct.unpack('i', compressed[511: 511 + size_int])[0]
+    table = [511 for i in range(511)]
+    for i in range(511):
+        table[i] = struct.unpack('B', compressed[i: i + 1])[0]
+    graph = reconstruct_graph(table)
+    huff = [255 for i in range(132)]
+    index = 0
+    for i in range(132):
+        bit = index % 8
+        byte = 511 + size_int + (index // 8)
+        b = (compressed[byte] & (1 << bit)) != 0
+        index += 1
+        p_graph = graph[255]
+        while p_graph[b] > 255:
+            p_graph = graph[p_graph[b] - 256]
+            bit = index % 8
+            byte = 511 + size_int + (index // 8)
+            b = (compressed[byte] & (1 << bit)) != 0
+            index += 1
+        huff[i] = p_graph[b]
+
+    n_bytes = 0
+    i = 0
+    pack = []
+    while 1:
+        delta = huff[i] & 127
+        if (huff[i] & 128) == 0:
+            for j in range(delta):
+                pack.append(huff[i + 1])
+            i += 2
+        else:
+            for j in range(delta):
+                pack.append(huff[i + 1 + j])
+            i += delta + 1
+        n_bytes += delta
+        if len(pack) >= 132:
+            break
+
+    buff = []
+    for c in pack[size_int: size_int + 128]:
+        if c != 0:
+            buff.append(c)
+    return bytearray(buff).decode(encoding), graph
+
+
 def extract(path, shotn, requested=None):
     if len(path) == 0:
         import urllib
@@ -213,7 +257,6 @@ def extract(path, shotn, requested=None):
         else:
             print("Unknown version of .sht file: %d" % version)
             exit(1)
-        print('version = %d' % version)
     else:
         print("Unknown version header of .sht file: '%s'" % version_str)
         exit(1)
@@ -221,7 +264,7 @@ def extract(path, shotn, requested=None):
     file.seek(1, 1)  # wtf?
 
     count = struct.unpack('i', file.read(size_int))[0]
-    print('count %d' % count)
+    print('Found %d signals.' % count)
     if version == 0:
         print('not implemented')
         exit(2)
@@ -229,26 +272,45 @@ def extract(path, shotn, requested=None):
         print('not implemented')
         exit(2)
     else:
-        result = {}
-        queue = []
+
+        queue_num = []
+        queue_str = []
         if requested is None:
-            queue = range(count)
+            queue_num = range(count)
         else:
             for item in requested:
-                if 0 <= item < count:
-                    queue.append(item)
+                if type(item) == int:
+                    if 0 <= item < count:
+                        queue_num.append(item)
+                    else:
+                        print('Requested item %d is out of range [%d, %d)' % (item, 0, count))
+                elif type(item) == str:
+                    queue_str.append(item)
                 else:
-                    print('Requested item %d is out of range [%d, %d)' % (item, 0, count))
+                    print('Unsupported type in request: %s' % type(item))
         processed = 1
+        print('decompressing...')
+        result = {}
+        result_map = {}
         for l in range(count):
             size = struct.unpack('i', file.read(size_int))[0]
             if size > 0:
                 raw = file.read(size)
-                if l in queue:
-                    print('decompressing...')
-                    huff = decompress_huffman(raw)
+                name, graph = decompress_name(raw)
+                flags = [bool(re.search(entry, name, re.IGNORECASE)) for entry in queue_str]
+                flag = sum(flags) > 0
+                if flag:
+                    for i in range(len(queue_str)):
+                        if flags[i]:
+                            if queue_str[i] in result_map:
+                                result_map[queue_str[i]].append(l)
+                            else:
+                                result_map[queue_str[i]] = [l]
+                if l in queue_num or flag:
+                    huff = decompress_huffman(raw, graph)
                     result[l] = unpack_struct(decompress_rle(huff))
-                    print('decompressed %d of %d' % (processed, len(queue)))
+                    print('  decompressed %d of %d' % (processed, len(queue_num)))
                     processed += 1
         file.close()
-        return result
+        print('done')
+        return result, result_map
