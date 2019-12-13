@@ -5,6 +5,7 @@ import re
 # - add error handling
 # - support old versions
 # - numpy is faster
+# - attempt to connect to remote if file is absent
 
 version_length = 11
 size_int = 4
@@ -237,7 +238,7 @@ def decompress_name(compressed):
 
 
 def extract(path, shotn, requested=None):
-    if len(path) == 0:
+    if path is None or type(path) != str or len(path) == 0:
         import urllib
         from smb.SMBHandler import SMBHandler
         opener = urllib.request.build_opener(SMBHandler)
@@ -272,9 +273,9 @@ def extract(path, shotn, requested=None):
         print('not implemented')
         exit(2)
     else:
-
         queue_num = []
         queue_str = []
+        result_map = {}
         if requested is None:
             queue_num = range(count)
         else:
@@ -286,12 +287,13 @@ def extract(path, shotn, requested=None):
                         print('Requested item %d is out of range [%d, %d)' % (item, 0, count))
                 elif type(item) == str:
                     queue_str.append(item)
+                    result_map[item] = []
                 else:
                     print('Unsupported type in request: %s' % type(item))
         processed = 1
         print('decompressing...')
         result = {}
-        result_map = {}
+
         for l in range(count):
             size = struct.unpack('i', file.read(size_int))[0]
             if size > 0:
@@ -302,10 +304,7 @@ def extract(path, shotn, requested=None):
                 if flag:
                     for i in range(len(queue_str)):
                         if flags[i]:
-                            if queue_str[i] in result_map:
-                                result_map[queue_str[i]].append(l)
-                            else:
-                                result_map[queue_str[i]] = [l]
+                            result_map[queue_str[i]].append(l)
                 if l in queue_num or flag:
                     huff = decompress_huffman(raw, graph)
                     result[l] = unpack_struct(decompress_rle(huff))
