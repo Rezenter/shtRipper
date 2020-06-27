@@ -1,4 +1,4 @@
-import ripper
+from python import ripper
 
 data, link = ripper.extract('', 38516, ['^i', 'SXR'])
 
