@@ -18,18 +18,3 @@ add_custom_target(
 add_executable(tester src/tester.cpp version.h src/niifaFile.cpp)
 add_dependencies(tester auto_increment_version)
 
-#add_library(caen743 SHARED src/CAEN743.cpp src/CAEN743.h src/root.h include/mds/mdsobjects.h)
-#target_link_libraries(caen743 ${CMAKE_CURRENT_SOURCE_DIR}/lib/CAENDigitizer.dll
-#        ${CMAKE_CURRENT_SOURCE_DIR}/lib/mds/mdsobjectscppshr.lib)
-
-#add_executable(test src/tester.cpp src/CAEN743.h)
-#target_link_libraries(test caen743)
-#add_dependencies(test caen743)
-
-#add_executable(copyTree src/copyTreeExample.cpp )
-#target_link_libraries(copyTree ${CMAKE_CURRENT_SOURCE_DIR}/lib/mds/mdsobjectscppshr.lib)
-
-#install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libSiSens.so
-#        DESTINATION /usr/share/labbot/modules/)
-
-

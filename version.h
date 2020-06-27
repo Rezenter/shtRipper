@@ -5,6 +5,6 @@
 #ifndef SHTRIPPER_VERSION_H
 #define SHTRIPPER_VERSION_H
 
-#define VERSION "0.2-110-390f6a4"
+#define VERSION "0.3-21-a557da5"
 
 #endif //SHTRIPPER_VERSION_H

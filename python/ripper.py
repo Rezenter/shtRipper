@@ -245,8 +245,7 @@ def extract(path, shotn, requested=None):
         print('Connecting to remote...')
         file = opener.open('smb://guest:Globus-M@172.16.12.127/Data/sht%d.SHT' % shotn)
     else:
-        #file = open('%s/sht%d.SHT' % (path, shotn), 'rb')
-        file = open('%s/000%d.dat' % (path, shotn), 'rb')
+        file = open('%s/sht%d.SHT' % (path, shotn), 'rb')
     version_str = file.read(version_length).decode('ascii')
     version = -1
     if version_str[0:8] == 'ANALIZER':
@@ -258,9 +257,11 @@ def extract(path, shotn, requested=None):
             version = 2
         else:
             print("Unknown version of .sht file: %d" % version)
+            file.close()
             exit(1)
     else:
         print("Unknown version header of .sht file: '%s'" % version_str)
+        file.close()
         exit(1)
 
     file.seek(1, 1)  # wtf?
@@ -269,9 +270,11 @@ def extract(path, shotn, requested=None):
     print('Found %d signals.' % count)
     if version == 0:
         print('not implemented')
+        file.close()
         exit(2)
     elif version == 1:
         print('not implemented')
+        file.close()
         exit(2)
     else:
         queue_num = []
