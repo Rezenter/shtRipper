@@ -1,8 +1,8 @@
-from python import niifaRipper
+from shtRipper import shtRipper
 
 print('example')
 
-signals = niifaRipper.extract('../in', 38654)
+signals = shtRipper.extract_niifa('../in', 38654)
 
 names = signals.keys()
 

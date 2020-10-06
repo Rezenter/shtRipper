@@ -1,17 +1,24 @@
+print('ripper initialising...')
 import struct
 import re
+
+import urllib
+from smb.SMBHandler import SMBHandler
+import matplotlib.pyplot as plt
 
 # to-do:
 # - add error handling
 # - support old versions
 # - numpy is faster
 # - attempt to connect to remote if file is absent
+# - fix "decompressed xxx of -111"
 
 version_length = 11
 size_int = 4
 size_double = 8
 size_long = 8
-encoding = 'cp1251'
+encoding_sht = 'cp1251'
+encoding_niifa = 'utf-8'
 
 
 def reconstruct_graph(table):
@@ -100,19 +107,19 @@ def unpack_struct(pack):
     for c in pack[pos: pos + 128]:
         if c != 0:
             buff.append(c)
-    res['name'] = bytearray(buff).decode(encoding)
+    res['name'] = bytearray(buff).decode(encoding_sht)
     pos += 128
     buff = []
     for c in pack[pos: pos + 128]:
         if c != 0:
             buff.append(c)
-    res['comm'] = bytearray(buff).decode(encoding)
+    res['comm'] = bytearray(buff).decode(encoding_sht)
     pos += 128
     buff = []
     for c in pack[pos: pos + 128]:
         if c != 0:
             buff.append(c)
-    res['unit'] = bytearray(buff).decode(encoding)
+    res['unit'] = bytearray(buff).decode(encoding_sht)
     pos += 128
 
     time = struct.unpack('HHHHHHHH', bytearray(pack[pos: pos + 16]))
@@ -182,7 +189,6 @@ def x_y(hist):
 
 
 def plot_hist(hist):
-    import matplotlib.pyplot as plt
     x, y = x_y(hist)
     plt.plot(x, y)
     plt.title(hist['name'])
@@ -234,13 +240,11 @@ def decompress_name(compressed):
     for c in pack[size_int: size_int + 128]:
         if c != 0:
             buff.append(c)
-    return bytearray(buff).decode(encoding), graph
+    return bytearray(buff).decode(encoding_sht), graph
 
 
-def extract(path, shotn, requested=None):
+def extract_sht(path, shotn, requested=None):
     if path is None or type(path) != str or len(path) == 0:
-        import urllib
-        from smb.SMBHandler import SMBHandler
         opener = urllib.request.build_opener(SMBHandler)
         print('Connecting to remote...')
         file = opener.open('smb://guest:Globus-M@172.16.12.127/Data/sht%d.SHT' % shotn)
@@ -305,15 +309,50 @@ def extract(path, shotn, requested=None):
                 name, graph = decompress_name(raw)
                 flags = [bool(re.search(entry, name, re.IGNORECASE)) for entry in queue_str]
                 flag = sum(flags) > 0
+                queue_length = len(queue_num)
                 if flag:
+                    queue_length = -111  # fix later
                     for i in range(len(queue_str)):
                         if flags[i]:
                             result_map[queue_str[i]].append(l)
                 if l in queue_num or flag:
                     huff = decompress_huffman(raw, graph)
                     result[l] = unpack_struct(decompress_rle(huff))
-                    print('  decompressed %d of %d' % (processed, len(queue_num)))
+                    print('  decompressed %d of %d' % (processed, queue_length))
                     processed += 1
         file.close()
         print('done')
         return result, result_map
+
+
+def extract_niifa(path, shotn):
+    if path is None or type(path) != str or len(path) == 0:
+        fuck  # i dont know .dat files path yet
+        opener = urllib.request.build_opener(SMBHandler)
+        print('Connecting to remote...')
+        file = opener.open('smb://guest:Globus-M@172.16.12.127/Data/sht%d.SHT' % shotn)
+    else:
+        file = open('%s/000%d.dat' % (path, shotn), 'rb')
+    data = file.read()
+    file.close()
+
+    start = data.find(bytes('t_ms', encoding=encoding_niifa))
+    stop = data.find(bytes('\n', encoding=encoding_niifa), start)
+    stop += 1
+
+    names = [entry.decode('utf-8') for entry in data[start: stop - 1].split(bytes(' ', encoding=encoding_niifa))]
+
+    result = {}
+    for signal in names:
+        result[signal] = []
+    slice_format = '%df' % len(names)
+    slice_size = 4 * len(names)
+
+    for time in range(int((len(data) - stop)/4/len(names))):
+        time_slice = struct.unpack(slice_format, data[stop: stop + slice_size])
+        stop += slice_size
+        for signal in range(len(names)):
+            result[names[signal]].append(time_slice[signal])
+
+    return result
+

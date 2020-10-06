@@ -2,9 +2,9 @@ import struct
 
 print('niifa ripper alive')
 
-encoding = 'utf-8'
+encoding_niifa = 'utf-8'
 
-def extract(path, shotn):
+def extract_niifa(path, shotn):
     if path is None or type(path) != str or len(path) == 0:
         fuck  # i dont know .dat files path yet
         import urllib
@@ -17,11 +17,11 @@ def extract(path, shotn):
     data = file.read()
     file.close()
 
-    start = data.find(bytes('t_ms', encoding=encoding))
-    stop = data.find(bytes('\n', encoding=encoding), start)
+    start = data.find(bytes('t_ms', encoding=encoding_niifa))
+    stop = data.find(bytes('\n', encoding=encoding_niifa), start)
     stop += 1
 
-    names = [entry.decode('utf-8') for entry in data[start: stop - 1].split(bytes(' ', encoding=encoding))]
+    names = [entry.decode('utf-8') for entry in data[start: stop - 1].split(bytes(' ', encoding=encoding_niifa))]
 
     result = {}
     for signal in names:
