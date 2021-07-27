@@ -8,8 +8,7 @@ import matplotlib.pyplot as plt
 # to-do:
 # - add error handling
 # - support old versions
-# - numpy is faster
-# - attempt to connect to remote if file is absent
+# - numpy is faster. myPy?
 # - fix "decompressed xxx of -111"
 
 version_length = 11
